@@ -1,5 +1,5 @@
 diff --git forkSrcPrefix/filters/f_decoder_wrapper.c forkDstPrefix/filters/f_decoder_wrapper.c
-index 5e2e8d7..93acbb0 100644
+index 5e2e8d7..a1b2c3d 100644
 --- forkSrcPrefix/filters/f_decoder_wrapper.c
 +++ forkDstPrefix/filters/f_decoder_wrapper.c
 @@ -816,7 +816,7 @@ static void correct_audio_pts(struct priv *p, struct mp_aframe *aframe)
@@ -11,3 +11,15 @@ index 5e2e8d7..93acbb0 100644
                  mp_mutex_lock(&p->cache_lock);
                  p->pts_reset = true;
                  mp_mutex_unlock(&p->cache_lock);
+@@ -826,7 +826,10 @@ static void correct_audio_pts(struct priv *p, struct mp_aframe *aframe)
+         // Keep the interpolated timestamp if it doesn't deviate more
+         // than 1 ms from the real one. (MKV rounded timestamps.)
+         if (p->pts == MP_NOPTS_VALUE || diff > 0.001)
+-            p->pts = frame_pts;
++        {
++            if (!(p->pts != MP_NOPTS_VALUE && frame_pts < p->pts && diff > 0.1))
++                p->pts = frame_pts;
++        }
+     }
+
+     if (p->pts == MP_NOPTS_VALUE && p->header->missing_timestamps)

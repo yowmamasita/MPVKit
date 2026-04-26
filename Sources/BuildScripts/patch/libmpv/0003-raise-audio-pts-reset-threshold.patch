@@ -1,0 +1,13 @@
+diff --git forkSrcPrefix/filters/f_decoder_wrapper.c forkDstPrefix/filters/f_decoder_wrapper.c
+index 5e2e8d7..93acbb0 100644
+--- forkSrcPrefix/filters/f_decoder_wrapper.c
++++ forkDstPrefix/filters/f_decoder_wrapper.c
+@@ -816,7 +816,7 @@ static void correct_audio_pts(struct priv *p, struct mp_aframe *aframe)
+         // than enough.
+         if (p->pts != MP_NOPTS_VALUE && diff > 0.1) {
+             MP_WARN(p, "Invalid audio PTS: %f -> %f\n", p->pts, frame_pts);
+-            if (diff >= 5) {
++            if (diff >= 300) {
+                 mp_mutex_lock(&p->cache_lock);
+                 p->pts_reset = true;
+                 mp_mutex_unlock(&p->cache_lock);

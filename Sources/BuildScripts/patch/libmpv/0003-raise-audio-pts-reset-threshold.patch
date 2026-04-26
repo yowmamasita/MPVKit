@@ -1,5 +1,5 @@
 diff --git forkSrcPrefix/filters/f_decoder_wrapper.c forkDstPrefix/filters/f_decoder_wrapper.c
-index 5e2e8d7..a1b2c3d 100644
+index 5e2e8d7..db3f708 100644
 --- forkSrcPrefix/filters/f_decoder_wrapper.c
 +++ forkDstPrefix/filters/f_decoder_wrapper.c
 @@ -816,7 +816,7 @@ static void correct_audio_pts(struct priv *p, struct mp_aframe *aframe)
@@ -21,5 +21,45 @@ index 5e2e8d7..a1b2c3d 100644
 +                p->pts = frame_pts;
 +        }
      }
-
+ 
      if (p->pts == MP_NOPTS_VALUE && p->header->missing_timestamps)
+diff --git forkSrcPrefix/player/playloop.c forkDstPrefix/player/playloop.c
+index f111920..5747f2d 100644
+--- forkSrcPrefix/player/playloop.c
++++ forkDstPrefix/player/playloop.c
+@@ -1123,16 +1123,17 @@ static void handle_dummy_ticks(struct MPContext *mpctx)
+ // Update current playback time.
+ static void handle_playback_time(struct MPContext *mpctx)
+ {
++    double new_pts = MP_NOPTS_VALUE;
+     if (mpctx->vo_chain &&
+         !mpctx->vo_chain->is_sparse &&
+         mpctx->video_status >= STATUS_PLAYING &&
+         mpctx->video_status < STATUS_EOF)
+     {
+-        mpctx->playback_pts = mpctx->video_pts;
++        new_pts = mpctx->video_pts;
+     } else if (mpctx->audio_status >= STATUS_PLAYING &&
+                mpctx->audio_status < STATUS_EOF)
+     {
+-        mpctx->playback_pts = playing_audio_pts(mpctx);
++        new_pts = playing_audio_pts(mpctx);
+     } else if (mpctx->video_status == STATUS_EOF &&
+                mpctx->audio_status == STATUS_EOF)
+     {
+@@ -1140,7 +1141,14 @@ static void handle_playback_time(struct MPContext *mpctx)
+         double vpts = mpctx->video_pts;
+         double mpts = MP_PTS_MAX(apts, vpts);
+         if (mpts != MP_NOPTS_VALUE)
+-            mpctx->playback_pts = mpts;
++            new_pts = mpts;
++    }
++
++    if (new_pts != MP_NOPTS_VALUE) {
++        if (mpctx->playback_pts != MP_NOPTS_VALUE &&
++            new_pts < mpctx->playback_pts - 1.0)
++            return;
++        mpctx->playback_pts = new_pts;
+     }
+ }
+ 

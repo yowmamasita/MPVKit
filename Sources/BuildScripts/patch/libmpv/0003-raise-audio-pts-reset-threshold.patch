@@ -1,8 +1,22 @@
 diff --git forkSrcPrefix/filters/f_decoder_wrapper.c forkDstPrefix/filters/f_decoder_wrapper.c
-index 5e2e8d7..db3f708 100644
+index 5e2e8d7..0e8f73d 100644
 --- forkSrcPrefix/filters/f_decoder_wrapper.c
 +++ forkDstPrefix/filters/f_decoder_wrapper.c
-@@ -816,7 +816,7 @@ static void correct_audio_pts(struct priv *p, struct mp_aframe *aframe)
+@@ -792,6 +792,13 @@ static void correct_video_pts(struct priv *p, struct mp_image *mpi)
+         }
+     }
+ 
++    if (p->pts != MP_NOPTS_VALUE && mpi->pts != MP_NOPTS_VALUE &&
++        mpi->pts < p->pts - 1.0)
++    {
++        double fps = p->fps > 0 ? p->fps : 25;
++        mpi->pts = p->pts + 1.0 / fps;
++    }
++
+     p->pts = mpi->pts;
+ }
+ 
+@@ -816,7 +823,7 @@ static void correct_audio_pts(struct priv *p, struct mp_aframe *aframe)
          // than enough.
          if (p->pts != MP_NOPTS_VALUE && diff > 0.1) {
              MP_WARN(p, "Invalid audio PTS: %f -> %f\n", p->pts, frame_pts);
@@ -11,7 +25,7 @@ index 5e2e8d7..db3f708 100644
                  mp_mutex_lock(&p->cache_lock);
                  p->pts_reset = true;
                  mp_mutex_unlock(&p->cache_lock);
-@@ -826,7 +826,10 @@ static void correct_audio_pts(struct priv *p, struct mp_aframe *aframe)
+@@ -826,7 +833,10 @@ static void correct_audio_pts(struct priv *p, struct mp_aframe *aframe)
          // Keep the interpolated timestamp if it doesn't deviate more
          // than 1 ms from the real one. (MKV rounded timestamps.)
          if (p->pts == MP_NOPTS_VALUE || diff > 0.001)

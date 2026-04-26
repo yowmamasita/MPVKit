@@ -1,21 +1,40 @@
 diff --git forkSrcPrefix/filters/f_decoder_wrapper.c forkDstPrefix/filters/f_decoder_wrapper.c
-index 5e2e8d7..a1b2c3d 100644
+index 5e2e8d7..b3c4d5e 100644
 --- forkSrcPrefix/filters/f_decoder_wrapper.c
 +++ forkDstPrefix/filters/f_decoder_wrapper.c
-@@ -792,6 +792,12 @@ static void correct_video_pts(struct priv *p, struct mp_image *mpi)
+@@ -193,6 +193,8 @@ struct priv {
+     // Final PTS of previously decoded frame
+     double pts;
+
++    bool drop_backward;
++
+     struct mp_image_params dec_format, last_format, fixed_format;
+
+     double fps;
+@@ -792,6 +794,14 @@ static void correct_video_pts(struct priv *p, struct mp_image *mpi)
          }
      }
 
++    p->drop_backward = false;
 +    if (p->pts != MP_NOPTS_VALUE && mpi->pts != MP_NOPTS_VALUE &&
 +        mpi->pts < p->pts - 1.0)
 +    {
++        p->drop_backward = true;
 +        return;
 +    }
 +
      p->pts = mpi->pts;
  }
 
-@@ -816,7 +822,7 @@ static void correct_audio_pts(struct priv *p, struct mp_aframe *aframe)
+@@ -808,6 +818,7 @@ static void correct_audio_pts(struct priv *p, struct mp_aframe *aframe)
+
+     double frame_pts = mp_aframe_get_pts(aframe);
+     double frame_len = mp_aframe_duration(aframe);
++    p->drop_backward = false;
+
+     if (frame_pts != MP_NOPTS_VALUE) {
+         if (dir < 0)
+@@ -816,7 +827,7 @@ static void correct_audio_pts(struct priv *p, struct mp_aframe *aframe)
          // than enough.
          if (p->pts != MP_NOPTS_VALUE && diff > 0.1) {
              MP_WARN(p, "Invalid audio PTS: %f -> %f\n", p->pts, frame_pts);
@@ -24,20 +43,33 @@ index 5e2e8d7..a1b2c3d 100644
                  mp_mutex_lock(&p->cache_lock);
                  p->pts_reset = true;
                  mp_mutex_unlock(&p->cache_lock);
-@@ -826,7 +832,12 @@ static void correct_audio_pts(struct priv *p, struct mp_aframe *aframe)
+@@ -826,7 +837,12 @@ static void correct_audio_pts(struct priv *p, struct mp_aframe *aframe)
          // Keep the interpolated timestamp if it doesn't deviate more
          // than 1 ms from the real one. (MKV rounded timestamps.)
          if (p->pts == MP_NOPTS_VALUE || diff > 0.001)
 -            p->pts = frame_pts;
 +        {
-+            if (p->pts != MP_NOPTS_VALUE && frame_pts < p->pts && diff > 0.1)
-+                mp_aframe_set_pts(aframe, p->pts);
-+            else
-+                p->pts = frame_pts;
++            if (p->pts != MP_NOPTS_VALUE && frame_pts < p->pts && diff > 0.1) {
++                p->drop_backward = true;
++                return;
++            }
++            p->pts = frame_pts;
 +        }
      }
 
      if (p->pts == MP_NOPTS_VALUE && p->header->missing_timestamps)
+@@ -1083,6 +1099,11 @@ static void read_frame(struct priv *p)
+
+ output_frame:
+     process_output_frame(p, frame);
++    if (p->drop_backward) {
++        mp_frame_unref(&frame);
++        mp_filter_internal_mark_progress(p->decf);
++        return;
++    }
+     mp_pin_in_write(pin, frame);
+ }
+
 diff --git forkSrcPrefix/player/playloop.c forkDstPrefix/player/playloop.c
 index f111920..5747f2d 100644
 --- forkSrcPrefix/player/playloop.c
